@@ -1,101 +1,87 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { getHomeData } from '@/lib/api';
+import HomeClient from './HomeClient';
+import TopBar from '@/components/layout/TopBar';
+import GenreFilter, { type Genre, type EnglishSubFilter } from '@/components/ui/GenreFilter';
+import UsernameModal from '@/components/ui/UsernameModal';
+import type { HomeData } from '@/lib/types';
+import { ScrollRowSkeleton } from '@/components/ui/LoadingSkeleton';
+import { useLanguage } from '@/hooks/useLanguage';
+
+export default function HomePage() {
+  const { languages, mounted } = useLanguage();
+  const [genre, setGenre] = useState<Genre>('All');
+  const [englishSubFilter, setEnglishSubFilter] = useState<EnglishSubFilter>('All English');
+  const [data, setData] = useState<HomeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [username, setUsernameState] = useState('');
+  const prevKey = useRef('');
+
+  const fetchData = (langs: string[], g: Genre) => {
+    const key = langs.join(',') + '|' + g;
+    if (key === prevKey.current) return;
+    prevKey.current = key;
+    setLoading(true);
+    setError(null);
+    getHomeData(langs, g)
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!mounted) return;
+    fetchData(languages, genre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [languages, genre, mounted]);
+
+  const handleUsernameDone = useCallback((name: string) => {
+    setUsernameState(name);
+  }, []);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div>
+      {/* First-visit username modal */}
+      <UsernameModal onDone={handleUsernameDone} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <TopBar />
+      <GenreFilter
+        active={genre}
+        onChange={setGenre}
+        isEnglishActive={languages.includes('english')}
+        activeEnglishSub={englishSubFilter}
+        onEnglishSubChange={setEnglishSubFilter}
+      />
+
+      {loading ? (
+        <div className="px-6 pt-4 pb-8 space-y-10">
+          <div>
+            <div className="h-9 w-52 bg-white/10 rounded-xl animate-pulse mb-2" />
+            <div className="h-4 w-72 bg-white/5 rounded animate-pulse" />
+          </div>
+          <div className="w-full h-72 md:h-96 rounded-2xl bg-white/5 animate-pulse" />
+          {/* Made For You skeleton */}
+          <ScrollRowSkeleton count={4} />
+          <ScrollRowSkeleton count={6} />
+          <ScrollRowSkeleton count={6} />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-32 text-white/30">
+          <p className="text-lg font-medium">Could not load content</p>
+          <p className="text-sm mt-2 text-red-400/60">{error}</p>
+          <button
+            onClick={() => { prevKey.current = ''; fetchData(languages, genre); }}
+            className="mt-6 px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-full transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : data ? (
+        <HomeClient data={data} username={username} englishSubFilter={englishSubFilter} />
+      ) : null}
     </div>
   );
 }
