@@ -163,7 +163,7 @@ const ENGLISH_POP_QUERIES = [
   'billie eilish ariana grande pop',
 ];
 
-async function buildEnglishSection(suffix: string): Promise<import('./types').LanguageSection> {
+async function buildEnglishSection(): Promise<import('./types').LanguageSection> {
   const [rap1, rap2, pop1, pop2, rapAlb, popAlb] = await Promise.all([
     searchSongs(ENGLISH_RAP_QUERIES[0], 0, 12).catch(() => null),
     searchSongs(ENGLISH_RAP_QUERIES[1], 0, 10).catch(() => null),
@@ -224,7 +224,7 @@ export async function getHomeData(
     ...albumSearches,
     searchArtists(artistQuery, 0, 10).catch(() => null),
     searchPlaylists(`${primaryLang} top playlist`, 0, 10).catch(() => null),
-    hasEnglish ? buildEnglishSection(suffix) : Promise.resolve(null),
+    hasEnglish ? buildEnglishSection() : Promise.resolve(null),
   ]);
 
   const n = nonEnglish.length;
