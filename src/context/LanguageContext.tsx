@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import type { Language } from '@/hooks/useLanguage';
 
 const STORAGE_KEY = 'preferred_languages';
-const DEFAULT: Language[] = ['tamil', 'hindi'];
+const DEFAULT: Language[] = ['hindi', 'punjabi'];
 
 interface LanguageContextValue {
   languages: Language[];
