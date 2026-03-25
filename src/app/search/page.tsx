@@ -7,13 +7,11 @@ import type { Song, Album, Artist } from '@/lib/types';
 import SongRow from '@/components/ui/SongRow';
 import SongCard from '@/components/ui/SongCard';
 import ArtistCard from '@/components/ui/ArtistCard';
-import { useLanguage } from '@/hooks/useLanguage';
-
 type Tab = 'songs' | 'albums' | 'artists';
 
+const isEnglishActive = true; // english is always included
+
 export default function SearchPage() {
-  const { languages } = useLanguage();
-  const isEnglishActive = languages.includes('english');
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<Tab>('songs');
   const [songs, setSongs] = useState<Song[]>([]);
@@ -40,7 +38,7 @@ export default function SearchPage() {
         setSearched(true);
       });
     },
-    [isEnglishActive]
+    []
   );
 
   const handleSubmit = (e: React.FormEvent) => {

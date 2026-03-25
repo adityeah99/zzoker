@@ -200,6 +200,7 @@ const FIXED_LANGUAGES = ['hindi', 'punjabi', 'tamil', 'english', 'bhojpuri'];
 const NON_ENGLISH = FIXED_LANGUAGES.filter((l) => l !== 'english');
 
 export async function getHomeData(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _languages: string[] = FIXED_LANGUAGES,
   genre = 'All',
 ): Promise<HomeData> {
