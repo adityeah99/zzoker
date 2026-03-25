@@ -58,11 +58,11 @@ export default function LanguageSelector() {
     return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
   })();
 
-  const Panel = (
+  const Panel = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <p className="text-white font-semibold text-base">Languages</p>
-        <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white transition-colors">
+        <button type="button" onClick={() => setOpen(false)} className="text-white/40 hover:text-white transition-colors">
           <X size={18} />
         </button>
       </div>
@@ -73,6 +73,7 @@ export default function LanguageSelector() {
           const selected = draft.includes(lang);
           return (
             <button
+              type="button"
               key={lang}
               onClick={() => toggle(lang)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
@@ -92,6 +93,7 @@ export default function LanguageSelector() {
       </div>
 
       <button
+        type="button"
         onClick={apply}
         className="mt-4 w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
       >
@@ -122,7 +124,7 @@ export default function LanguageSelector() {
       {/* Desktop dropdown */}
       {!isMobile && open && (
         <div className="absolute right-0 top-full mt-2 w-56 bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-          {Panel}
+          <Panel />
         </div>
       )}
 
@@ -142,7 +144,7 @@ export default function LanguageSelector() {
           >
             {/* Drag handle */}
             <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-5" />
-            {Panel}
+            <Panel />
           </div>
         </>
       )}
