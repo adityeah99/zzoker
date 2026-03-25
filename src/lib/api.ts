@@ -335,6 +335,35 @@ export async function getHomeData(
   };
 }
 
+// ─── CREDITS ────────────────────────────────────────────────────────────────
+
+export interface CreditEntry {
+  role: string;
+  name: string;
+  id?: string;
+}
+
+// Fetch artists.all from /songs?id=xxx — each entry has role + name
+export async function getSongCredits(id: string): Promise<CreditEntry[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await fetchApi<any[]>('/songs', { id });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw: any = Array.isArray(data) ? data[0] : data;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: any[] = raw?.artists?.all ?? [];
+    return all
+      .filter((a) => a?.name && a?.role)
+      .map((a) => ({
+        role: String(a.role),
+        name: String(a.name),
+        id: a.id ? String(a.id) : undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
 export function getHighQualityUrl(

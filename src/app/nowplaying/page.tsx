@@ -14,6 +14,8 @@ import { downloadSong } from '@/lib/download';
 import { useToast } from '@/components/ui/Toast';
 import QueuePanel from '@/components/ui/QueuePanel';
 import LyricsSheet from '@/components/ui/LyricsSheet';
+import CreditsPanel from '@/components/ui/CreditsPanel';
+import NextInQueue from '@/components/ui/NextInQueue';
 
 export default function NowPlayingPage() {
   const router = useRouter();
@@ -106,13 +108,13 @@ export default function NowPlayingPage() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col animate-slide-up overflow-hidden"
+      className="fixed inset-0 z-[100] flex flex-col animate-slide-up"
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Blurred background */}
+      {/* Blurred background — fixed behind everything */}
       <div
-        className="absolute inset-0 scale-110"
+        className="absolute inset-0 scale-110 pointer-events-none"
         style={{
           backgroundImage: `url(${artwork})`,
           backgroundSize: 'cover',
@@ -120,41 +122,43 @@ export default function NowPlayingPage() {
           filter: 'blur(48px) brightness(0.35) saturate(1.8)',
         }}
       />
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/50 pointer-events-none" />
 
-      {/* Content */}
+      {/* Content — scrollable so desktop credits/queue section is reachable */}
       <div
-        className="relative z-10 flex flex-col h-full px-6 pb-8"
+        className="relative z-10 flex-1 overflow-y-auto overscroll-none"
         style={{ paddingTop: 'env(safe-area-inset-top, 20px)' }}
       >
-        {/* Drag handle */}
-        <div className="w-10 h-1 bg-white/30 rounded-full mx-auto mt-1 mb-2" />
+        {/* ── Main player area — fills viewport height ── */}
+        <div className="flex flex-col min-h-[calc(100dvh-env(safe-area-inset-top,20px))] px-6 pb-8">
+          {/* Drag handle */}
+          <div className="w-10 h-1 bg-white/30 rounded-full mx-auto mt-1 mb-2" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between py-3">
-          <button
-            onClick={() => router.back()}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20"
-          >
-            <ChevronDown size={20} className="text-white" />
-          </button>
-          <p className="text-white text-sm font-semibold tracking-wide uppercase opacity-60">Now Playing</p>
-          <div className="w-9" />
-        </div>
-
-        {/* Artwork */}
-        <div className="flex-1 flex items-center justify-center py-4">
-          <div className="w-full max-w-[80vw] aspect-square rounded-3xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.6)]">
-            <Image
-              src={artwork}
-              alt={currentSong.name}
-              width={500}
-              height={500}
-              className="w-full h-full object-cover"
-              priority
-            />
+          {/* Header */}
+          <div className="flex items-center justify-between py-3">
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+            >
+              <ChevronDown size={20} className="text-white" />
+            </button>
+            <p className="text-white text-sm font-semibold tracking-wide uppercase opacity-60">Now Playing</p>
+            <div className="w-9" />
           </div>
-        </div>
+
+          {/* Artwork */}
+          <div className="flex-1 md:flex-none flex items-center justify-center py-4 md:py-6">
+            <div className="w-full max-w-[80vw] md:max-w-[320px] aspect-square rounded-3xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.6)]">
+              <Image
+                src={artwork}
+                alt={currentSong.name}
+                width={500}
+                height={500}
+                className="w-full h-full object-cover"
+                priority
+              />
+            </div>
+          </div>
 
         {/* Song info + like */}
         <div className="flex items-start justify-between mb-5">
@@ -287,7 +291,17 @@ export default function NowPlayingPage() {
             <span className="text-[9px]">Share</span>
           </button>
         </div>
-      </div>
+        </div>{/* end main player area */}
+
+        {/* ── Desktop: Credits + Next in Queue — below the fold ── */}
+        <div className="hidden md:grid grid-cols-2 divide-x divide-white/10 mx-6 mb-8 rounded-2xl overflow-hidden border border-white/8 animate-in fade-in duration-500"
+          style={{ background: '#1c1c1e' }}
+        >
+          <CreditsPanel songId={currentSong.id} />
+          <NextInQueue onOpenQueue={() => { setShowLyrics(false); setShowQueue(true); }} />
+        </div>
+
+      </div>{/* end scrollable content */}
 
       {/* Queue panel — z above nowplaying */}
       <QueuePanel open={showQueue} onClose={() => setShowQueue(false)} />
