@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Play, Pause, Heart, Download } from 'lucide-react';
+import { Play, Pause, Heart, Download, MoreHorizontal } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
 import { getImageUrl, formatDuration } from '@/lib/api';
 import { downloadSong, type DownloadQuality } from '@/lib/download';
@@ -15,9 +15,47 @@ interface SongRowProps {
   index: number;
   queue: Song[];
   showAlbum?: boolean;
+  /** 'album' = Apple Music tracklist style (no artwork, explicit badge, 3-dot menu) */
+  variant?: 'default' | 'album';
+  onOptions?: (song: Song) => void;
 }
 
-export default function SongRow({ song, index, queue, showAlbum = false }: SongRowProps) {
+/** Animated equalizer bars shown when the song is currently playing */
+function EqBars({ playing }: { playing: boolean }) {
+  return (
+    <div className="flex gap-px items-end h-4">
+      {[10, 14, 8].map((h, i) => (
+        <span
+          key={i}
+          className={`w-[3px] rounded-full bg-red-400 ${playing ? 'animate-bounce' : 'opacity-60'}`}
+          style={{
+            height: `${h}px`,
+            animationDelay: playing ? `${i * 80}ms` : undefined,
+            animationDuration: '600ms',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Small gray "E" explicit badge */
+function ExplicitBadge() {
+  return (
+    <span className="shrink-0 text-[9px] font-bold bg-white/15 text-white/40 px-1 py-0.5 rounded leading-none">
+      E
+    </span>
+  );
+}
+
+export default function SongRow({
+  song,
+  index,
+  queue,
+  showAlbum = false,
+  variant = 'default',
+  onOptions,
+}: SongRowProps) {
   const { playSong, togglePlay, currentSong, isPlaying } = usePlayer();
   const { showToast } = useToast();
   const [liked, setLiked] = useState(false);
@@ -25,6 +63,7 @@ export default function SongRow({ song, index, queue, showAlbum = false }: SongR
   const [showPicker, setShowPicker] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const isActive = currentSong?.id === song.id;
+  const isExplicit = song.explicitContent === true || (song.explicitContent as unknown as number) === 1;
 
   useEffect(() => {
     const likedIds: string[] = JSON.parse(localStorage.getItem('likedSongs') || '[]');
@@ -62,9 +101,8 @@ export default function SongRow({ song, index, queue, showAlbum = false }: SongR
     try {
       await downloadSong(song, quality);
       showToast(`Downloaded ${song.name}`, 'success');
-    } catch (e) {
+    } catch {
       showToast(`Failed to download ${song.name}`, 'error');
-      console.error(e);
     } finally {
       setDownloading(false);
     }
@@ -73,10 +111,57 @@ export default function SongRow({ song, index, queue, showAlbum = false }: SongR
   const artwork = getImageUrl(song.image, '50x50');
   const artistName = song.artists?.primary?.map((a) => a.name).join(', ') || '';
 
+  // ── Album variant (Apple Music tracklist style) ───────────────────────────
+  if (variant === 'album') {
+    return (
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={handlePlay}
+        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+          isActive ? 'bg-white/8' : 'hover:bg-white/5 active:bg-white/8'
+        }`}
+      >
+        {/* Index / EQ bars */}
+        <div className="w-7 flex items-center justify-center shrink-0">
+          {isActive ? (
+            <EqBars playing={isPlaying} />
+          ) : hovered ? (
+            <Play size={15} fill="white" className="text-white" />
+          ) : (
+            <span className="text-sm tabular-nums text-white/40">{index + 1}</span>
+          )}
+        </div>
+
+        {/* Title + artist */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className={`text-sm font-medium truncate ${isActive ? 'text-red-400' : 'text-white'}`}>
+              {song.name}
+            </p>
+            {isExplicit && <ExplicitBadge />}
+          </div>
+          <p className="text-xs text-white/50 truncate mt-0.5">{artistName}</p>
+        </div>
+
+        {/* 3-dot menu */}
+        {onOptions && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOptions(song); }}
+            className="w-8 h-8 flex items-center justify-center text-white/30 hover:text-white/70 active:text-white shrink-0 transition-colors"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ── Default variant ───────────────────────────────────────────────────────
   return (
     <div
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); }}
+      onMouseLeave={() => setHovered(false)}
       onClick={handlePlay}
       className={`flex items-center gap-3 px-4 py-2 rounded-xl cursor-pointer group transition-colors ${
         isActive ? 'bg-white/10' : 'hover:bg-white/5'
@@ -102,9 +187,12 @@ export default function SongRow({ song, index, queue, showAlbum = false }: SongR
 
       {/* Title & Artist */}
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isActive ? 'text-red-400' : 'text-white'}`}>
-          {song.name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className={`text-sm font-medium truncate ${isActive ? 'text-red-400' : 'text-white'}`}>
+            {song.name}
+          </p>
+          {isExplicit && <ExplicitBadge />}
+        </div>
         <p className="text-xs text-white/50 truncate">{artistName}</p>
       </div>
 
@@ -130,22 +218,16 @@ export default function SongRow({ song, index, queue, showAlbum = false }: SongR
         {song.duration ? formatDuration(song.duration) : '—'}
       </span>
 
-      {/* Download button + quality picker */}
+      {/* Download + quality picker */}
       <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={handleDownloadClick}
           disabled={downloading}
           title="Download"
-          className={`
-            transition-colors
-            md:text-white/0 md:group-hover:text-white/40 md:hover:!text-white
-            text-white/40 hover:text-white
-            ${downloading ? 'opacity-50 cursor-not-allowed' : ''}
-          `}
+          className={`transition-colors md:text-white/0 md:group-hover:text-white/40 md:hover:!text-white text-white/40 hover:text-white ${downloading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <Download size={16} className={downloading ? 'animate-bounce' : ''} />
         </button>
-
         {showPicker && (
           <QualityPicker
             onSelect={handleQualitySelect}
@@ -154,6 +236,16 @@ export default function SongRow({ song, index, queue, showAlbum = false }: SongR
           />
         )}
       </div>
+
+      {/* 3-dot menu (if provided) */}
+      {onOptions && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onOptions(song); }}
+          className="w-7 h-7 flex items-center justify-center text-white/0 group-hover:text-white/40 hover:!text-white/70 shrink-0 transition-colors"
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      )}
     </div>
   );
 }

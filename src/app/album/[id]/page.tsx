@@ -1,24 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
 import { getAlbum } from '@/lib/api';
 import AlbumClient from './AlbumClient';
 import type { Album } from '@/lib/types';
 import { RowSkeleton } from '@/components/ui/LoadingSkeleton';
-
-function MobileBackButton() {
-  const router = useRouter();
-  return (
-    <button
-      onClick={() => router.back()}
-      className="md:hidden fixed top-4 left-4 z-30 w-9 h-9 rounded-full bg-black/60 backdrop-blur flex items-center justify-center text-white border border-white/10 active:scale-90 transition-transform"
-    >
-      <ChevronLeft size={18} />
-    </button>
-  );
-}
 
 export default function AlbumPage({ params }: { params: { id: string } }) {
   const [album, setAlbum] = useState<Album | null>(null);
@@ -52,5 +38,5 @@ export default function AlbumPage({ params }: { params: { id: string } }) {
     </div>
   );
 
-  return <><MobileBackButton /><AlbumClient album={album} /></>;
+  return <AlbumClient album={album} />;
 }
