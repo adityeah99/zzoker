@@ -337,6 +337,67 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  // ── Media Session — metadata ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!state.currentSong || typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    const song = state.currentSong;
+    const artwork = (song.image ?? [])
+      .filter((img) => img.url)
+      .map((img) => ({ src: img.url, sizes: img.quality, type: 'image/jpeg' as const }));
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: song.name,
+      artist: song.artists?.primary?.map((a) => a.name).join(', ') ?? '',
+      album: song.album?.name ?? '',
+      artwork,
+    });
+  }, [state.currentSong]);
+
+  // ── Media Session — playback state ────────────────────────────────────────
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
+  }, [state.isPlaying]);
+
+  // ── Media Session — position state ────────────────────────────────────────
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    if (!state.isPlaying) return;
+    const audio = audioRef.current;
+    if (!audio || !isFinite(audio.duration) || audio.duration <= 0) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: audio.duration,
+        playbackRate: audio.playbackRate,
+        position: Math.min(audio.currentTime, audio.duration),
+      });
+    } catch {}
+  }, [state.currentTime, state.isPlaying]);
+
+  // ── Media Session — action handlers ───────────────────────────────────────
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.setActionHandler('play', () => { audioRef.current?.play().catch(() => {}); });
+    navigator.mediaSession.setActionHandler('pause', () => { audioRef.current?.pause(); });
+    navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
+    navigator.mediaSession.setActionHandler('previoustrack', () => prevSong());
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined) seekTo(details.seekTime);
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      const skip = details.seekOffset ?? 15;
+      seekTo(Math.max(0, (audioRef.current?.currentTime ?? 0) - skip));
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      const skip = details.seekOffset ?? 15;
+      const dur = audioRef.current?.duration ?? 0;
+      seekTo(Math.min(dur, (audioRef.current?.currentTime ?? 0) + skip));
+    });
+    return () => {
+      (['play', 'pause', 'nexttrack', 'previoustrack', 'seekto', 'seekbackward', 'seekforward'] as const)
+        .forEach((action) => { try { navigator.mediaSession.setActionHandler(action, null); } catch {} });
+    };
+  }, [nextSong, prevSong, seekTo]);
+
   const value: PlayerContextType = {
     ...state,
     playSong, pauseSong, togglePlay,
