@@ -22,7 +22,7 @@ export default function Sidebar() {
           <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
             <Music2 size={18} className="text-white" />
           </div>
-          <span className="text-white font-bold text-xl tracking-tight">Free Music <span className="text-red-500">by zZoker</span></span>
+          <span className="text-white font-bold text-xl tracking-tight">Zen<span className="text-red-500">vibe</span></span>
         </div>
 
         {/* Nav */}

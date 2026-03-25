@@ -71,7 +71,7 @@ export default function NowPlayingPage() {
     if (navigator.share) {
       await navigator.share({
         title: currentSong.name,
-        text: `Listening to ${currentSong.name} on Free Music by zZoker`,
+        text: `Listening to ${currentSong.name} on Zenvibe`,
         url: window.location.origin,
       }).catch(() => {});
     } else {

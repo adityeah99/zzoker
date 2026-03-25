@@ -11,13 +11,13 @@ import InstallBanner from '@/components/ui/InstallBanner';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Free Music by zZoker',
-  description: 'Stream millions of songs for free with zZoker',
+  title: 'Zenvibe',
+  description: 'Zenvibe — Free ad-free music streaming',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Zzoker',
+    title: 'Zenvibe',
   },
   icons: {
     apple: '/icons/apple-touch-icon.png',

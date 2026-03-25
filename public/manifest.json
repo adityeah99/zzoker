@@ -1,7 +1,7 @@
 {
-  "name": "Free Music by zZoker",
-  "short_name": "Zzoker",
-  "description": "Free ad-free music streaming by Zzoker",
+  "name": "Zenvibe",
+  "short_name": "Zenvibe",
+  "description": "Zenvibe — Free ad-free music streaming",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

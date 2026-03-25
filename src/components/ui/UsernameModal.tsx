@@ -51,7 +51,7 @@ export default function UsernameModal({ onDone }: UsernameModalProps) {
           </div>
 
           <h2 className="text-white text-2xl font-bold text-center mb-1">
-            Welcome to Free Music
+            Welcome to Zenvibe
           </h2>
           <p className="text-white/40 text-sm text-center mb-8">
             What should we call you?
