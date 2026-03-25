@@ -1,4 +1,7 @@
 import type { Song, Album, Artist, Playlist, HomeData, SearchResult, ApiResponse } from './types';
+import {
+  normalizeSong, normalizeAlbum, normalizeArtist, normalizePlaylist, normalizeSearchResult,
+} from './utils';
 
 // Hosted instance of https://github.com/sumitkolhe/jiosaavn-api
 const BASE_URL = 'https://saavn.sumit.co/api';
@@ -20,65 +23,53 @@ async function fetchApi<T>(endpoint: string, params: Record<string, string> = {}
 // ─── SEARCH ─────────────────────────────────────────────────────────────────
 
 export async function searchSongs(query: string, page = 0, limit = 20): Promise<SearchResult<Song>> {
-  return fetchApi<SearchResult<Song>>('/search/songs', {
-    query,
-    page: String(page),
-    limit: String(limit),
-  });
+  const res = await fetchApi<SearchResult<Song>>('/search/songs', { query, page: String(page), limit: String(limit) });
+  return normalizeSearchResult(res, normalizeSong);
 }
 
 export async function searchAlbums(query: string, page = 0, limit = 20): Promise<SearchResult<Album>> {
-  return fetchApi<SearchResult<Album>>('/search/albums', {
-    query,
-    page: String(page),
-    limit: String(limit),
-  });
+  const res = await fetchApi<SearchResult<Album>>('/search/albums', { query, page: String(page), limit: String(limit) });
+  return normalizeSearchResult(res, normalizeAlbum);
 }
 
 export async function searchArtists(query: string, page = 0, limit = 20): Promise<SearchResult<Artist>> {
-  return fetchApi<SearchResult<Artist>>('/search/artists', {
-    query,
-    page: String(page),
-    limit: String(limit),
-  });
+  const res = await fetchApi<SearchResult<Artist>>('/search/artists', { query, page: String(page), limit: String(limit) });
+  return normalizeSearchResult(res, normalizeArtist);
 }
 
 export async function searchPlaylists(query: string, page = 0, limit = 20): Promise<SearchResult<Playlist>> {
-  return fetchApi<SearchResult<Playlist>>('/search/playlists', {
-    query,
-    page: String(page),
-    limit: String(limit),
-  });
+  const res = await fetchApi<SearchResult<Playlist>>('/search/playlists', { query, page: String(page), limit: String(limit) });
+  return normalizeSearchResult(res, normalizePlaylist);
 }
 
 // ─── SONGS ──────────────────────────────────────────────────────────────────
 
 // GET /api/songs/{id}  — returns Song[]
 export async function getSong(id: string): Promise<Song[]> {
-  return fetchApi<Song[]>(`/songs/${id}`);
+  const res = await fetchApi<Song[]>(`/songs/${id}`);
+  return res.map(normalizeSong);
 }
 
 // GET /api/songs/{id}/suggestions
 export async function getSongSuggestions(id: string, limit = 10): Promise<Song[]> {
-  return fetchApi<Song[]>(`/songs/${id}/suggestions`, { limit: String(limit) });
+  const res = await fetchApi<Song[]>(`/songs/${id}/suggestions`, { limit: String(limit) });
+  return res.map(normalizeSong);
 }
 
 // ─── ALBUMS ─────────────────────────────────────────────────────────────────
 
 // GET /api/albums?id=xxx
 export async function getAlbum(id: string): Promise<Album> {
-  return fetchApi<Album>('/albums', { id });
+  const res = await fetchApi<Album>('/albums', { id });
+  return normalizeAlbum(res);
 }
 
 // ─── PLAYLISTS ───────────────────────────────────────────────────────────────
 
 // GET /api/playlists?id=xxx&page=0&limit=10
 export async function getPlaylist(id: string, page = 0, limit = 50): Promise<Playlist> {
-  return fetchApi<Playlist>('/playlists', {
-    id,
-    page: String(page),
-    limit: String(limit),
-  });
+  const res = await fetchApi<Playlist>('/playlists', { id, page: String(page), limit: String(limit) });
+  return normalizePlaylist(res);
 }
 
 // ─── ARTISTS ────────────────────────────────────────────────────────────────
@@ -89,12 +80,13 @@ export async function getArtist(
   songCount = 10,
   albumCount = 10,
 ): Promise<Artist> {
-  return fetchApi<Artist>(`/artists/${id}`, {
+  const res = await fetchApi<Artist>(`/artists/${id}`, {
     songCount: String(songCount),
     albumCount: String(albumCount),
     sortBy: 'popularity',
     sortOrder: 'desc',
   });
+  return normalizeArtist(res);
 }
 
 // GET /api/artists/{id}/songs
@@ -104,11 +96,8 @@ export async function getArtistSongs(
   sortBy = 'popularity',
   sortOrder = 'desc',
 ): Promise<SearchResult<Song>> {
-  return fetchApi<SearchResult<Song>>(`/artists/${id}/songs`, {
-    page: String(page),
-    sortBy,
-    sortOrder,
-  });
+  const res = await fetchApi<SearchResult<Song>>(`/artists/${id}/songs`, { page: String(page), sortBy, sortOrder });
+  return normalizeSearchResult(res, normalizeSong);
 }
 
 // GET /api/artists/{id}/albums
@@ -118,11 +107,8 @@ export async function getArtistAlbums(
   sortBy = 'popularity',
   sortOrder = 'desc',
 ): Promise<SearchResult<Album>> {
-  return fetchApi<SearchResult<Album>>(`/artists/${id}/albums`, {
-    page: String(page),
-    sortBy,
-    sortOrder,
-  });
+  const res = await fetchApi<SearchResult<Album>>(`/artists/${id}/albums`, { page: String(page), sortBy, sortOrder });
+  return normalizeSearchResult(res, normalizeAlbum);
 }
 
 // ─── HOME DATA ───────────────────────────────────────────────────────────────
