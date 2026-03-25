@@ -12,19 +12,24 @@ import { usePlayer } from '@/context/PlayerContext';
 import { getImageUrl } from '@/lib/api';
 import { downloadSong } from '@/lib/download';
 import { useToast } from '@/components/ui/Toast';
+import QueuePanel from '@/components/ui/QueuePanel';
+import LyricsSheet from '@/components/ui/LyricsSheet';
 
 export default function NowPlayingPage() {
   const router = useRouter();
   const {
-    currentSong, isPlaying, currentTime, duration,
+    currentSong, isPlaying, currentTime, duration, volume,
     isShuffle, repeatMode, isLoading,
-    togglePlay, nextSong, prevSong, seekTo,
+    togglePlay, nextSong, prevSong, seekTo, setVolume,
     toggleShuffle, toggleRepeat,
   } = usePlayer();
   const { showToast } = useToast();
 
   const [liked, setLiked] = useState(false);
   const [dlLoading, setDlLoading] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
   const touchStartY = useRef(0);
 
   useEffect(() => {
@@ -33,7 +38,6 @@ export default function NowPlayingPage() {
     setLiked(ids.includes(currentSong.id));
   }, [currentSong]);
 
-  // Redirect if no song
   useEffect(() => {
     if (!currentSong) router.replace('/');
   }, [currentSong, router]);
@@ -65,7 +69,14 @@ export default function NowPlayingPage() {
   const handleShare = async () => {
     if (!currentSong) return;
     if (navigator.share) {
-      await navigator.share({ title: currentSong.name, text: `Listening to ${currentSong.name}` }).catch(() => {});
+      await navigator.share({
+        title: currentSong.name,
+        text: `Listening to ${currentSong.name} on Free Music by zZoker`,
+        url: window.location.origin,
+      }).catch(() => {});
+    } else {
+      await navigator.clipboard?.writeText(window.location.origin).catch(() => {});
+      showToast('Link copied!', 'success');
     }
   };
 
@@ -80,11 +91,13 @@ export default function NowPlayingPage() {
   const artistName = currentSong?.artists?.primary?.map((a) => a.name).join(', ') ?? '';
   const artwork = getImageUrl(currentSong?.image, '500x500');
 
-  // Swipe down to close
+  // Swipe down to close (only when sheets are closed)
   const onTouchStart = (e: React.TouchEvent) => {
+    if (showQueue || showLyrics) return;
     touchStartY.current = e.touches[0].clientY;
   };
   const onTouchEnd = (e: React.TouchEvent) => {
+    if (showQueue || showLyrics) return;
     const delta = e.changedTouches[0].clientY - touchStartY.current;
     if (delta > 80) router.back();
   };
@@ -164,16 +177,13 @@ export default function NowPlayingPage() {
         {/* Progress bar */}
         <div className="mb-5">
           <div
-            className="h-1 w-full bg-white/20 rounded-full cursor-pointer active:scale-y-150 transition-transform"
+            className="h-1 w-full bg-white/20 rounded-full cursor-pointer"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               seekTo(((e.clientX - rect.left) / rect.width) * duration);
             }}
           >
-            <div
-              className="h-full bg-white rounded-full relative"
-              style={{ width: `${progress}%` }}
-            >
+            <div className="h-full bg-white rounded-full relative" style={{ width: `${progress}%` }}>
               <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-md" />
             </div>
           </div>
@@ -184,7 +194,7 @@ export default function NowPlayingPage() {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between mb-8 px-2">
+        <div className="flex items-center justify-between mb-6 px-2">
           <button
             onClick={toggleShuffle}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
@@ -193,14 +203,9 @@ export default function NowPlayingPage() {
           >
             <Shuffle size={20} />
           </button>
-
-          <button
-            onClick={prevSong}
-            className="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform"
-          >
+          <button onClick={prevSong} className="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform">
             <SkipBack size={32} fill="currentColor" />
           </button>
-
           <button
             onClick={togglePlay}
             className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-xl active:scale-90 transition-transform"
@@ -213,14 +218,9 @@ export default function NowPlayingPage() {
               <Play size={28} className="text-black ml-1" fill="black" />
             )}
           </button>
-
-          <button
-            onClick={nextSong}
-            className="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform"
-          >
+          <button onClick={nextSong} className="w-12 h-12 flex items-center justify-center text-white active:scale-90 transition-transform">
             <SkipForward size={32} fill="currentColor" />
           </button>
-
           <button
             onClick={toggleRepeat}
             className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
@@ -231,17 +231,43 @@ export default function NowPlayingPage() {
           </button>
         </div>
 
+        {/* Volume slider (inline, shown on tap) */}
+        {showVolume && (
+          <div className="mb-4 flex items-center gap-3 bg-white/10 rounded-2xl px-4 py-3">
+            <Volume2 size={16} className="text-white/50 shrink-0" />
+            <input
+              type="range"
+              min={0} max={1} step={0.01}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              className="flex-1 accent-white"
+            />
+            <span className="text-white/40 text-xs w-8 text-right">{Math.round(volume * 100)}</span>
+          </div>
+        )}
+
         {/* Bottom icons */}
         <div className="flex items-center justify-between px-1">
-          <button className="flex flex-col items-center gap-1 text-white/30 active:text-white/60 transition-colors">
+          <button
+            onClick={() => { setShowLyrics(true); setShowQueue(false); }}
+            className="flex flex-col items-center gap-1 text-white/30 active:text-white/60 transition-colors"
+          >
             <Mic2 size={20} />
             <span className="text-[9px]">Lyrics</span>
           </button>
-          <button className="flex flex-col items-center gap-1 text-white/30 active:text-white/60 transition-colors">
+          <button
+            onClick={() => { setShowQueue(true); setShowLyrics(false); }}
+            className="flex flex-col items-center gap-1 text-white/30 active:text-white/60 transition-colors"
+          >
             <ListMusic size={20} />
             <span className="text-[9px]">Queue</span>
           </button>
-          <button className="flex flex-col items-center gap-1 text-white/30 active:text-white/60 transition-colors">
+          <button
+            onClick={() => setShowVolume((v) => !v)}
+            className={`flex flex-col items-center gap-1 transition-colors ${
+              showVolume ? 'text-red-400' : 'text-white/30 active:text-white/60'
+            }`}
+          >
             <Volume2 size={20} />
             <span className="text-[9px]">Volume</span>
           </button>
@@ -262,6 +288,17 @@ export default function NowPlayingPage() {
           </button>
         </div>
       </div>
+
+      {/* Queue panel — z above nowplaying */}
+      <QueuePanel open={showQueue} onClose={() => setShowQueue(false)} />
+
+      {/* Lyrics sheet */}
+      <LyricsSheet
+        open={showLyrics}
+        onClose={() => setShowLyrics(false)}
+        songId={currentSong.id}
+        songName={currentSong.name}
+      />
     </div>
   );
 }

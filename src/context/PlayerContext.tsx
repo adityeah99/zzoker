@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
 import type { Song } from '@/lib/types';
-import { getHighQualityUrl } from '@/lib/api';
+import { getHighQualityUrl, searchSongs } from '@/lib/api';
 
 interface PlayerState {
   currentSong: Song | null;
@@ -30,14 +30,31 @@ interface PlayerActions {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   addToQueue: (song: Song) => void;
+  playNext: (song: Song) => void;
+  removeFromQueue: (index: number) => void;
+  clearQueue: () => void;
 }
 
 type PlayerContextType = PlayerState & PlayerActions;
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Holds the pre-shuffle queue so we can restore it when shuffle is turned off
+  const originalQueueRef = useRef<Song[]>([]);
+  // Signals that the queue ran out and we should auto-fetch similar songs
+  const autoFetchNeededRef = useRef(false);
+
   const [state, setState] = useState<PlayerState>({
     currentSong: null,
     queue: [],
@@ -52,21 +69,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     isLoading: false,
   });
 
-  // Init audio element
+  // ── Audio element init ────────────────────────────────────────────────────
   useEffect(() => {
     const audio = new Audio();
     audio.volume = state.volume;
     audioRef.current = audio;
 
-    const onTimeUpdate = () =>
-      setState((s) => ({ ...s, currentTime: audio.currentTime }));
-    const onDurationChange = () =>
-      setState((s) => ({ ...s, duration: audio.duration || 0 }));
-    const onEnded = () => handleEnded();
-    const onCanPlay = () => setState((s) => ({ ...s, isLoading: false }));
-    const onWaiting = () => setState((s) => ({ ...s, isLoading: true }));
-    const onPlay = () => setState((s) => ({ ...s, isPlaying: true }));
-    const onPause = () => setState((s) => ({ ...s, isPlaying: false }));
+    const onTimeUpdate    = () => setState((s) => ({ ...s, currentTime: audio.currentTime }));
+    const onDurationChange = () => setState((s) => ({ ...s, duration: audio.duration || 0 }));
+    const onEnded         = () => handleEnded();
+    const onCanPlay       = () => setState((s) => ({ ...s, isLoading: false }));
+    const onWaiting       = () => setState((s) => ({ ...s, isLoading: true }));
+    const onPlay          = () => setState((s) => ({ ...s, isPlaying: true }));
+    const onPause         = () => setState((s) => ({ ...s, isPlaying: false }));
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
@@ -89,6 +104,35 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Auto-fetch similar songs when queue exhausted ─────────────────────────
+  useEffect(() => {
+    if (state.isPlaying || !autoFetchNeededRef.current || !state.currentSong) return;
+    autoFetchNeededRef.current = false;
+
+    const song = state.currentSong;
+    const artistName = song.artists?.primary?.[0]?.name;
+    if (!artistName) return;
+
+    searchSongs(artistName, 0, 8)
+      .then((res) => {
+        const similar = res.results.filter((s) => s.id !== song.id).slice(0, 5);
+        if (similar.length === 0) return;
+        const audio = audioRef.current;
+        const firstUrl = getHighQualityUrl(similar[0].downloadUrl);
+        if (!audio || !firstUrl) return;
+        audio.src = firstUrl;
+        audio.play().catch(console.error);
+        setState((s) => ({
+          ...s,
+          queue: [...s.queue, ...similar],
+          queueIndex: s.queue.length, // first of the similar songs
+          currentSong: similar[0],
+        }));
+      })
+      .catch(() => {});
+  }, [state.isPlaying, state.currentSong]);
+
+  // ── handleEnded ───────────────────────────────────────────────────────────
   const handleEnded = useCallback(() => {
     setState((s) => {
       const audio = audioRef.current;
@@ -100,31 +144,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         return s;
       }
 
-      let nextIndex: number;
-      if (s.isShuffle) {
-        nextIndex = Math.floor(Math.random() * s.queue.length);
-      } else {
-        nextIndex = s.queueIndex + 1;
-      }
+      const nextIndex = s.isShuffle
+        ? Math.floor(Math.random() * s.queue.length)
+        : s.queueIndex + 1;
 
       if (nextIndex >= s.queue.length) {
         if (s.repeatMode === 'all') {
-          nextIndex = 0;
-        } else {
-          return { ...s, isPlaying: false };
+          const first = s.queue[0];
+          const url = getHighQualityUrl(first.downloadUrl);
+          if (url) { audio.src = url; audio.play(); }
+          return { ...s, currentSong: first, queueIndex: 0 };
         }
+        // Queue exhausted — signal auto-fetch
+        autoFetchNeededRef.current = true;
+        return { ...s, isPlaying: false };
       }
 
-      const nextSong = s.queue[nextIndex];
-      const url = getHighQualityUrl(nextSong.downloadUrl);
-      if (url) {
-        audio.src = url;
-        audio.play();
-      }
-      return { ...s, currentSong: nextSong, queueIndex: nextIndex };
+      const next = s.queue[nextIndex];
+      const url = getHighQualityUrl(next.downloadUrl);
+      if (url) { audio.src = url; audio.play(); }
+      return { ...s, currentSong: next, queueIndex: nextIndex };
     });
   }, []);
 
+  // ── playSong ──────────────────────────────────────────────────────────────
   const playSong = useCallback((song: Song, queue?: Song[]) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -134,6 +177,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
     const newQueue = queue || [song];
     const idx = newQueue.findIndex((s) => s.id === song.id);
+
+    // Reset shuffle original queue
+    originalQueueRef.current = [];
 
     audio.src = url;
     audio.play().catch(console.error);
@@ -145,7 +191,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('recentlyPlayed', JSON.stringify([song, ...filtered].slice(0, 50)));
     } catch {}
 
-    // Track detailed listening history for personalization
+    // Track detailed listening history
     try {
       type HistoryEntry = { id: string; title: string; artist: string; artistId: string; language: string; timestamp: number };
       const history: HistoryEntry[] = JSON.parse(localStorage.getItem('listening_history') || '[]');
@@ -167,21 +213,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       queue: newQueue,
       queueIndex: idx >= 0 ? idx : 0,
       isLoading: true,
+      isShuffle: false, // reset shuffle on new queue
     }));
   }, []);
 
-  const pauseSong = useCallback(() => {
-    audioRef.current?.pause();
-  }, []);
+  const pauseSong = useCallback(() => { audioRef.current?.pause(); }, []);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (audio.paused) {
-      audio.play().catch(console.error);
-    } else {
-      audio.pause();
-    }
+    if (audio.paused) audio.play().catch(console.error);
+    else audio.pause();
   }, []);
 
   const nextSong = useCallback(() => {
@@ -189,19 +231,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const audio = audioRef.current;
       if (!audio || s.queue.length === 0) return s;
 
-      let nextIndex: number;
-      if (s.isShuffle) {
-        nextIndex = Math.floor(Math.random() * s.queue.length);
-      } else {
-        nextIndex = (s.queueIndex + 1) % s.queue.length;
-      }
+      const nextIndex = s.isShuffle
+        ? Math.floor(Math.random() * s.queue.length)
+        : (s.queueIndex + 1) % s.queue.length;
 
       const next = s.queue[nextIndex];
       const url = getHighQualityUrl(next.downloadUrl);
-      if (url) {
-        audio.src = url;
-        audio.play().catch(console.error);
-      }
+      if (url) { audio.src = url; audio.play().catch(console.error); }
       return { ...s, currentSong: next, queueIndex: nextIndex };
     });
   }, []);
@@ -210,20 +246,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setState((s) => {
       const audio = audioRef.current;
       if (!audio) return s;
-
-      // If > 3 seconds in, restart current song
-      if (audio.currentTime > 3) {
-        audio.currentTime = 0;
-        return s;
-      }
-
+      if (audio.currentTime > 3) { audio.currentTime = 0; return s; }
       const prevIndex = s.queueIndex === 0 ? s.queue.length - 1 : s.queueIndex - 1;
       const prev = s.queue[prevIndex];
       const url = getHighQualityUrl(prev.downloadUrl);
-      if (url) {
-        audio.src = url;
-        audio.play().catch(console.error);
-      }
+      if (url) { audio.src = url; audio.play().catch(console.error); }
       return { ...s, currentSong: prev, queueIndex: prevIndex };
     });
   }, []);
@@ -245,15 +272,32 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const toggleMute = useCallback(() => {
     setState((s) => {
-      if (audioRef.current) {
-        audioRef.current.muted = !s.isMuted;
-      }
+      if (audioRef.current) audioRef.current.muted = !s.isMuted;
       return { ...s, isMuted: !s.isMuted };
     });
   }, []);
 
+  // ── toggleShuffle — saves/restores original order ─────────────────────────
   const toggleShuffle = useCallback(() => {
-    setState((s) => ({ ...s, isShuffle: !s.isShuffle }));
+    setState((s) => {
+      if (!s.isShuffle) {
+        // Turning ON: save original, shuffle songs after current position
+        originalQueueRef.current = s.queue;
+        const before = s.queue.slice(0, s.queueIndex + 1);
+        const after  = shuffle(s.queue.slice(s.queueIndex + 1));
+        return { ...s, isShuffle: true, queue: [...before, ...after] };
+      } else {
+        // Turning OFF: restore original order
+        const orig = originalQueueRef.current;
+        if (orig.length > 0) {
+          const currentId = s.currentSong?.id;
+          const newIdx = orig.findIndex((sq) => sq.id === currentId);
+          originalQueueRef.current = [];
+          return { ...s, isShuffle: false, queue: orig, queueIndex: newIdx >= 0 ? newIdx : s.queueIndex };
+        }
+        return { ...s, isShuffle: false };
+      }
+    });
   }, []);
 
   const toggleRepeat = useCallback(() => {
@@ -268,19 +312,38 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, queue: [...s.queue, song] }));
   }, []);
 
+  // Add song to play immediately after current
+  const playNext = useCallback((song: Song) => {
+    setState((s) => {
+      const before = s.queue.slice(0, s.queueIndex + 1);
+      const after  = s.queue.slice(s.queueIndex + 1);
+      return { ...s, queue: [...before, song, ...after] };
+    });
+  }, []);
+
+  const removeFromQueue = useCallback((index: number) => {
+    setState((s) => {
+      const newQueue = s.queue.filter((_, i) => i !== index);
+      const newIndex = index < s.queueIndex ? s.queueIndex - 1 : s.queueIndex;
+      return { ...s, queue: newQueue, queueIndex: Math.min(newIndex, newQueue.length - 1) };
+    });
+  }, []);
+
+  const clearQueue = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      queue: s.currentSong ? [s.currentSong] : [],
+      queueIndex: 0,
+    }));
+  }, []);
+
   const value: PlayerContextType = {
     ...state,
-    playSong,
-    pauseSong,
-    togglePlay,
-    nextSong,
-    prevSong,
-    seekTo,
-    setVolume,
-    toggleMute,
-    toggleShuffle,
-    toggleRepeat,
-    addToQueue,
+    playSong, pauseSong, togglePlay,
+    nextSong, prevSong, seekTo,
+    setVolume, toggleMute,
+    toggleShuffle, toggleRepeat,
+    addToQueue, playNext, removeFromQueue, clearQueue,
   };
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

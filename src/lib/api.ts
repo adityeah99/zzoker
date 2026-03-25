@@ -56,6 +56,27 @@ export async function getSongSuggestions(id: string, limit = 10): Promise<Song[]
   return res.map(normalizeSong);
 }
 
+// GET /api/songs/{id}/lyrics
+export async function getSongLyrics(id: string): Promise<{ lyrics?: string; snippet?: string } | null> {
+  try {
+    return await fetchApi<{ lyrics?: string; snippet?: string }>(`/songs/${id}/lyrics`);
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/modules?language=... (trending homepage data)
+export async function getTrendingSongs(): Promise<Song[]> {
+  try {
+    const res = await fetchApi<{ trending?: { songs?: Song[] } }>('/modules', {
+      language: 'hindi,punjabi,tamil,english,bhojpuri',
+    });
+    return (res?.trending?.songs ?? []).map(normalizeSong);
+  } catch {
+    return [];
+  }
+}
+
 // ─── ALBUMS ─────────────────────────────────────────────────────────────────
 
 // GET /api/albums?id=xxx
