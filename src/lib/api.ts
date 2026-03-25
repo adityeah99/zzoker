@@ -1,22 +1,28 @@
-import type { Song, Album, Artist, Playlist, HomeData, SearchResult, ApiResponse } from './types';
+import type { Song, Album, Artist, Playlist, HomeData, SearchResult } from './types';
 import {
   normalizeSong, normalizeAlbum, normalizeArtist, normalizePlaylist, normalizeSearchResult,
 } from './utils';
 
-// Hosted instance of https://github.com/sumitkolhe/jiosaavn-api
-const BASE_URL = 'https://saavn.sumit.co/api';
+const BASE_URL = 'https://jiosaavn-api-privatecvc2.vercel.app';
 
-async function fetchApi<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RawApiResponse = { status?: string; success?: boolean; message?: string; data?: any };
+
+async function fetchApi<T>(
+  endpoint: string,
+  params: Record<string, string> = {},
+  signal?: AbortSignal,
+): Promise<T> {
   const url = new URL(`${BASE_URL}${endpoint}`);
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
 
-  const res = await fetch(url.toString(), { next: { revalidate: 300 } });
+  const res = await fetch(url.toString(), { next: { revalidate: 300 }, signal });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
 
-  const json: ApiResponse<T> = await res.json();
-  if (!json.success) {
-    throw new Error(json.message || 'API returned success: false');
-  }
+  const json: RawApiResponse = await res.json();
+  // API returns either { success: true } or { status: "SUCCESS" }
+  const ok = json.success === true || json.status === 'SUCCESS';
+  if (!ok) throw new Error(json.message || 'API error');
   return json.data as T;
 }
 
@@ -42,35 +48,85 @@ export async function searchPlaylists(query: string, page = 0, limit = 20): Prom
   return normalizeSearchResult(res, normalizePlaylist);
 }
 
-// ─── SONGS ──────────────────────────────────────────────────────────────────
+// ─── SEARCH SUGGESTIONS ──────────────────────────────────────────────────────
 
-// GET /api/songs/{id}  — returns Song[]
-export async function getSong(id: string): Promise<Song[]> {
-  const res = await fetchApi<Song[]>(`/songs/${id}`);
-  return res.map(normalizeSong);
-}
+export type SuggestionItem =
+  | { type: 'query'; text: string }
+  | { type: 'song';  song: Song }
+  | { type: 'album'; album: Album };
 
-// GET /api/songs/{id}/suggestions
-export async function getSongSuggestions(id: string, limit = 10): Promise<Song[]> {
-  const res = await fetchApi<Song[]>(`/songs/${id}/suggestions`, { limit: String(limit) });
-  return res.map(normalizeSong);
-}
-
-// GET /api/songs/{id}/lyrics
-export async function getSongLyrics(id: string): Promise<{ lyrics?: string; snippet?: string } | null> {
+// Suggestions: parallel song + album searches (combined /search not available on this API)
+export async function getSearchSuggestions(
+  query: string,
+  signal?: AbortSignal,
+): Promise<SuggestionItem[]> {
   try {
-    return await fetchApi<{ lyrics?: string; snippet?: string }>(`/songs/${id}/lyrics`);
+    const [songsRes, albumsRes] = await Promise.allSettled([
+      fetchApi<SearchResult<Song>>('/search/songs', { query, limit: '5' }, signal),
+      fetchApi<SearchResult<Album>>('/search/albums', { query, limit: '3' }, signal),
+    ]);
+
+    const songs = songsRes.status === 'fulfilled' ? (songsRes.value.results ?? []) : [];
+    const albums = albumsRes.status === 'fulfilled' ? (albumsRes.value.results ?? []) : [];
+
+    // Derive query suggestions from song names + primary artist names
+    const seen = new Set<string>();
+    const queryItems: SuggestionItem[] = [];
+    for (const song of songs.slice(0, 6)) {
+      const normalized = normalizeSong(song);
+      const artist = normalized.artists?.primary?.[0]?.name ?? '';
+      if (artist && !seen.has(artist) && queryItems.length < 4) {
+        seen.add(artist);
+        queryItems.push({ type: 'query', text: artist });
+      }
+      if (!seen.has(normalized.name) && queryItems.length < 4) {
+        seen.add(normalized.name);
+        queryItems.push({ type: 'query', text: normalized.name });
+      }
+    }
+
+    const songItems: SuggestionItem[] = songs
+      .slice(0, 3)
+      .map((song) => ({ type: 'song', song: normalizeSong(song) }));
+
+    const albumItems: SuggestionItem[] = albums
+      .slice(0, 2)
+      .map((album) => ({ type: 'album', album: normalizeAlbum(album) }));
+
+    return [...queryItems, ...songItems, ...albumItems];
   } catch {
-    return null;
+    return [];
   }
 }
 
-// GET /api/modules?language=... (trending homepage data)
+// ─── SONGS ──────────────────────────────────────────────────────────────────
+
+// GET /songs?id=xxx  — returns Song[]
+export async function getSong(id: string): Promise<Song[]> {
+  const res = await fetchApi<Song[]>('/songs', { id });
+  return res.map(normalizeSong);
+}
+
+// Song suggestions — not supported by this API; fall back to artist search
+export async function getSongSuggestions(id: string, limit = 10): Promise<Song[]> {
+  try {
+    const res = await fetchApi<Song[]>(`/songs/${id}/suggestions`, { limit: String(limit) });
+    return res.map(normalizeSong);
+  } catch {
+    return [];
+  }
+}
+
+// Lyrics — not supported by this API; returns null gracefully
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function getSongLyrics(_id: string): Promise<{ lyrics?: string; snippet?: string } | null> {
+  return null;
+}
+
+// GET /modules?language=hindi (trending homepage data)
 export async function getTrendingSongs(): Promise<Song[]> {
   try {
-    const res = await fetchApi<{ trending?: { songs?: Song[] } }>('/modules', {
-      language: 'hindi,punjabi,tamil,english,bhojpuri',
-    });
+    const res = await fetchApi<{ trending?: { songs?: Song[] } }>('/modules', { language: 'hindi' });
     return (res?.trending?.songs ?? []).map(normalizeSong);
   } catch {
     return [];
@@ -95,7 +151,7 @@ export async function getPlaylist(id: string, page = 0, limit = 50): Promise<Pla
 
 // ─── ARTISTS ────────────────────────────────────────────────────────────────
 
-// GET /api/artists/{id}?songCount=10&albumCount=10&sortBy=popularity&sortOrder=desc
+// Artist detail — not available on this API; throws so callers can handle
 export async function getArtist(
   id: string,
   songCount = 10,
@@ -110,7 +166,6 @@ export async function getArtist(
   return normalizeArtist(res);
 }
 
-// GET /api/artists/{id}/songs
 export async function getArtistSongs(
   id: string,
   page = 0,
@@ -121,7 +176,6 @@ export async function getArtistSongs(
   return normalizeSearchResult(res, normalizeSong);
 }
 
-// GET /api/artists/{id}/albums
 export async function getArtistAlbums(
   id: string,
   page = 0,

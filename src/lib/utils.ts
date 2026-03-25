@@ -12,62 +12,102 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
-// ── Normalize helpers (decode entities on all text fields) ────────────────────
+// The vercel API returns image/downloadUrl with `link` instead of `url`.
+// Normalise to always have `url`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fixUrl(arr: any[] | undefined): { quality: string; url: string }[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((item) => ({
+    quality: item.quality ?? '',
+    url: item.url || item.link || '',
+  }));
+}
+
+// The vercel API returns artists as a flat comma-separated string:
+//   primaryArtists: "Arijit Singh, Shilpa Rao"
+//   primaryArtistsId: "456323, 455148"
+// Build the artists.primary[] array from those when artists.primary is absent.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fixArtists(raw: any): Song['artists'] {
+  // Already normalised (new API format with nested objects)
+  if (raw?.artists?.primary) return raw.artists;
+
+  const names: string[] = (raw.primaryArtists ?? '')
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  const ids: string[] = (raw.primaryArtistsId ?? '')
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+
+  const primary: Artist[] = names.map((name, i) => ({
+    id: ids[i] ?? '',
+    name: decodeHtmlEntities(name),
+  }));
+
+  return { primary };
+}
+
+// ── Normalize helpers ─────────────────────────────────────────────────────────
 
 function normalizeArtistShallow(a: Artist): Artist {
-  return { ...a, name: decodeHtmlEntities(a.name) };
+  return {
+    ...a,
+    name: decodeHtmlEntities(a.name),
+    image: fixUrl(a.image as unknown as never[]),
+  };
 }
 
 export function normalizeArtist(artist: Artist): Artist {
   return {
     ...artist,
     name: decodeHtmlEntities(artist.name),
+    image: fixUrl(artist.image as unknown as never[]),
     topSongs: artist.topSongs?.map(normalizeSong),
     topAlbums: artist.topAlbums?.map(normalizeAlbum),
     similarArtists: artist.similarArtists?.map(normalizeArtistShallow),
   };
 }
 
-export function normalizeSong(song: Song): Song {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeSong(song: any): Song {
   return {
     ...song,
-    name: decodeHtmlEntities(song.name),
+    name: decodeHtmlEntities(song.name ?? ''),
+    image: fixUrl(song.image),
+    downloadUrl: fixUrl(song.downloadUrl),
     album: song.album
       ? { ...song.album, name: decodeHtmlEntities(song.album.name ?? '') }
       : undefined,
-    artists: song.artists
-      ? {
-          primary:  song.artists.primary?.map(normalizeArtistShallow),
-          featured: song.artists.featured?.map(normalizeArtistShallow),
-          all:      song.artists.all?.map(normalizeArtistShallow),
-        }
-      : undefined,
+    artists: fixArtists(song),
   };
 }
 
-export function normalizeAlbum(album: Album): Album {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizeAlbum(album: any): Album {
+  const artists = album.artists?.primary
+    ? album.artists
+    : fixArtists(album);
   return {
     ...album,
-    name:        decodeHtmlEntities(album.name),
+    name: decodeHtmlEntities(album.name ?? ''),
     description: decodeHtmlEntities(album.description ?? ''),
-    songs:       album.songs?.map(normalizeSong),
-    artists: album.artists
-      ? {
-          primary:  album.artists.primary?.map(normalizeArtistShallow),
-          featured: album.artists.featured?.map(normalizeArtistShallow),
-          all:      album.artists.all?.map(normalizeArtistShallow),
-        }
-      : undefined,
+    image: fixUrl(album.image),
+    songs: album.songs?.map(normalizeSong),
+    artists,
   };
 }
 
-export function normalizePlaylist(playlist: Playlist): Playlist {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function normalizePlaylist(playlist: any): Playlist {
   return {
     ...playlist,
-    name:        decodeHtmlEntities(playlist.name),
+    name: decodeHtmlEntities(playlist.name ?? ''),
     description: decodeHtmlEntities(playlist.description ?? ''),
-    songs:       playlist.songs?.map(normalizeSong),
-    artists:     playlist.artists?.map(normalizeArtistShallow),
+    image: fixUrl(playlist.image),
+    songs: playlist.songs?.map(normalizeSong),
+    artists: playlist.artists?.map(normalizeArtistShallow),
   };
 }
 
@@ -75,5 +115,5 @@ export function normalizeSearchResult<T>(
   result: SearchResult<T>,
   fn: (item: T) => T,
 ): SearchResult<T> {
-  return { ...result, results: result.results.map(fn) };
+  return { ...result, results: (result.results ?? []).map(fn) };
 }
