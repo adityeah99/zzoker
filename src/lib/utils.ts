@@ -32,6 +32,17 @@ function fixArtists(raw: any): Song['artists'] {
   // Already normalised (new API format with nested objects)
   if (raw?.artists?.primary) return raw.artists;
 
+  // Modules API: primaryArtists is an array of artist objects
+  if (Array.isArray(raw?.primaryArtists)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const primary: Artist[] = (raw.primaryArtists as any[]).map((a) => ({
+      id: a.id ?? '',
+      name: decodeHtmlEntities(a.name ?? ''),
+      image: fixUrl(a.image),
+    }));
+    return { primary };
+  }
+
   const names: string[] = (raw.primaryArtists ?? '')
     .split(',')
     .map((s: string) => s.trim())

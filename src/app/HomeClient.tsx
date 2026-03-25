@@ -5,7 +5,7 @@ import SongCard from '@/components/ui/SongCard';
 import ArtistCard from '@/components/ui/ArtistCard';
 import HeroBanner from '@/components/ui/HeroBanner';
 import MadeForYou from '@/components/ui/MadeForYou';
-import type { HomeData, Song, LanguageSection } from '@/lib/types';
+import type { HomeData, Song, Album, LanguageSection } from '@/lib/types';
 import { getImageUrl } from '@/lib/api';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -13,6 +13,7 @@ import Link from 'next/link';
 interface HomeClientProps {
   data: HomeData;
   username: string;
+  newReleases: Album[];
 }
 
 function renderSection(section: LanguageSection) {
@@ -89,11 +90,8 @@ function renderSection(section: LanguageSection) {
   );
 }
 
-export default function HomeClient({ data, username }: HomeClientProps) {
+export default function HomeClient({ data, username, newReleases }: HomeClientProps) {
   const { sections, topArtists, featuredPlaylists } = data;
-
-  const allSongs = sections.flatMap((s) => s.songs);
-  const heroItem = allSongs[0] ?? sections[0]?.albums[0] ?? null;
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -112,8 +110,19 @@ export default function HomeClient({ data, username }: HomeClientProps) {
         <p className="text-white/40 text-sm mt-1">What would you like to listen to?</p>
       </div>
 
+      {/* New Releases row */}
+      {newReleases.length > 0 && (
+        <ScrollRow title="New Releases 🆕">
+          {newReleases.map((album) => (
+            <div key={album.id} className="shrink-0 w-40 md:w-44">
+              <SongCard item={album} type="album" />
+            </div>
+          ))}
+        </ScrollRow>
+      )}
+
       {/* Hero Banner */}
-      {heroItem && <HeroBanner item={heroItem} type="song" />}
+      {newReleases.length > 0 && <HeroBanner items={newReleases} />}
 
       {/* ── Made For You ── */}
       <MadeForYou username={username} />

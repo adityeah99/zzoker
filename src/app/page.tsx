@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { getHomeData } from '@/lib/api';
+import { getHomeData, getNewReleases } from '@/lib/api';
 import HomeClient from './HomeClient';
 import TopBar from '@/components/layout/TopBar';
 import GenreFilter, { type Genre } from '@/components/ui/GenreFilter';
 import UsernameModal from '@/components/ui/UsernameModal';
-import type { HomeData } from '@/lib/types';
+import type { HomeData, Album } from '@/lib/types';
 import { ScrollRowSkeleton } from '@/components/ui/LoadingSkeleton';
 
 const LANGUAGES = ['hindi', 'punjabi', 'tamil', 'english', 'bhojpuri'];
@@ -17,6 +17,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [username, setUsernameState] = useState('');
+  const [newReleases, setNewReleases] = useState<Album[]>([]);
   const prevKey = useRef('');
 
   const fetchData = (g: Genre) => {
@@ -35,6 +36,10 @@ export default function HomePage() {
     fetchData(genre);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genre]);
+
+  useEffect(() => {
+    getNewReleases().then(setNewReleases);
+  }, []);
 
   const handleUsernameDone = useCallback((name: string) => {
     setUsernameState(name);
@@ -69,7 +74,7 @@ export default function HomePage() {
           </button>
         </div>
       ) : data ? (
-        <HomeClient data={data} username={username} />
+        <HomeClient data={data} username={username} newReleases={newReleases} />
       ) : null}
     </div>
   );

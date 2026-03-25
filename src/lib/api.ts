@@ -133,6 +133,31 @@ export async function getTrendingSongs(): Promise<Song[]> {
   }
 }
 
+const NR_CACHE_KEY = 'zenvibe_nr_v1';
+const NR_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+export async function getNewReleases(): Promise<Album[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(NR_CACHE_KEY);
+      if (raw) {
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts < NR_TTL) return data as Album[];
+      }
+    } catch {}
+  }
+  try {
+    const res = await fetchApi<{ albums?: Album[] }>('/modules', { language: 'hindi' });
+    const albums = (res.albums ?? []).slice(0, 10).map(normalizeAlbum);
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem(NR_CACHE_KEY, JSON.stringify({ data: albums, ts: Date.now() })); } catch {}
+    }
+    return albums;
+  } catch {
+    return [];
+  }
+}
+
 // ─── ALBUMS ─────────────────────────────────────────────────────────────────
 
 // GET /api/albums?id=xxx
