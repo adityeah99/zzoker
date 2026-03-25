@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 import MusicPlayer from '@/components/layout/MusicPlayer';
+import BottomNav from '@/components/layout/BottomNav';
 import { PlayerProvider } from '@/context/PlayerContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import InstallBanner from '@/components/ui/InstallBanner';
@@ -34,12 +35,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PlayerProvider>
           <ToastProvider>
             <div className="flex h-screen overflow-hidden">
-              <Sidebar />
-              <main className="flex-1 overflow-y-auto scrollbar-hide pb-32 md:pb-28">
+              {/* Sidebar — desktop only */}
+              <div className="hidden md:block">
+                <Sidebar />
+              </div>
+              {/*
+                Mobile: pb accounts for mini player (~68px) + bottom nav (~56px) + safe area
+                Desktop: pb accounts for full player bar (~100px)
+              */}
+              <main className="flex-1 overflow-y-auto scrollbar-hide pb-[160px] md:pb-28">
                 {children}
               </main>
             </div>
+
+            {/* MusicPlayer: on mobile sits above BottomNav via --player-bottom CSS var */}
+            <style>{`
+              @media (max-width: 767px) {
+                :root { --player-bottom: 56px; }
+              }
+              @media (min-width: 768px) {
+                :root { --player-bottom: 0px; }
+              }
+            `}</style>
+
             <MusicPlayer />
+            <BottomNav />
             <InstallBanner />
           </ToastProvider>
         </PlayerProvider>

@@ -1,10 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronLeft } from 'lucide-react';
 import { getPlaylist } from '@/lib/api';
 import PlaylistClient from './PlaylistClient';
 import type { Playlist } from '@/lib/types';
 import { RowSkeleton } from '@/components/ui/LoadingSkeleton';
+
+function MobileBackButton() {
+  const router = useRouter();
+  return (
+    <button
+      onClick={() => router.back()}
+      className="md:hidden fixed top-4 left-4 z-30 w-9 h-9 rounded-full bg-black/60 backdrop-blur flex items-center justify-center text-white border border-white/10 active:scale-90 transition-transform"
+    >
+      <ChevronLeft size={18} />
+    </button>
+  );
+}
 
 export default function PlaylistPage({ params }: { params: { id: string } }) {
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
@@ -37,5 +51,5 @@ export default function PlaylistPage({ params }: { params: { id: string } }) {
     </div>
   );
 
-  return <PlaylistClient playlist={playlist} />;
+  return <><MobileBackButton /><PlaylistClient playlist={playlist} /></>;
 }
