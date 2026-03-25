@@ -5,7 +5,6 @@ import Sidebar from '@/components/layout/Sidebar';
 import MusicPlayer from '@/components/layout/MusicPlayer';
 import { PlayerProvider } from '@/context/PlayerContext';
 import { ToastProvider } from '@/components/ui/Toast';
-import { LanguageProvider } from '@/context/LanguageContext';
 import InstallBanner from '@/components/ui/InstallBanner';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -32,7 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <body className="bg-black text-white antialiased">
-        <LanguageProvider>
         <PlayerProvider>
           <ToastProvider>
             <div className="flex h-screen overflow-hidden">
@@ -45,7 +43,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <InstallBanner />
           </ToastProvider>
         </PlayerProvider>
-        </LanguageProvider>
       </body>
     </html>
   );

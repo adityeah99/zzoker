@@ -4,39 +4,37 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { getHomeData } from '@/lib/api';
 import HomeClient from './HomeClient';
 import TopBar from '@/components/layout/TopBar';
-import GenreFilter, { type Genre, type EnglishSubFilter } from '@/components/ui/GenreFilter';
+import GenreFilter, { type Genre } from '@/components/ui/GenreFilter';
 import UsernameModal from '@/components/ui/UsernameModal';
 import type { HomeData } from '@/lib/types';
 import { ScrollRowSkeleton } from '@/components/ui/LoadingSkeleton';
-import { useLanguage } from '@/hooks/useLanguage';
+
+const LANGUAGES = ['hindi', 'punjabi', 'tamil', 'english', 'bhojpuri'];
 
 export default function HomePage() {
-  const { languages, mounted } = useLanguage();
   const [genre, setGenre] = useState<Genre>('All');
-  const [englishSubFilter, setEnglishSubFilter] = useState<EnglishSubFilter>('All English');
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [username, setUsernameState] = useState('');
   const prevKey = useRef('');
 
-  const fetchData = (langs: string[], g: Genre) => {
-    const key = langs.join(',') + '|' + g;
+  const fetchData = (g: Genre) => {
+    const key = g;
     if (key === prevKey.current) return;
     prevKey.current = key;
     setLoading(true);
     setError(null);
-    getHomeData(langs, g)
+    getHomeData(LANGUAGES, g)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    if (!mounted) return;
-    fetchData(languages, genre);
+    fetchData(genre);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [languages, genre, mounted]);
+  }, [genre]);
 
   const handleUsernameDone = useCallback((name: string) => {
     setUsernameState(name);
@@ -44,17 +42,9 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* First-visit username modal */}
       <UsernameModal onDone={handleUsernameDone} />
-
       <TopBar />
-      <GenreFilter
-        active={genre}
-        onChange={setGenre}
-        isEnglishActive={languages.includes('english')}
-        activeEnglishSub={englishSubFilter}
-        onEnglishSubChange={setEnglishSubFilter}
-      />
+      <GenreFilter active={genre} onChange={setGenre} />
 
       {loading ? (
         <div className="px-6 pt-4 pb-8 space-y-10">
@@ -63,7 +53,6 @@ export default function HomePage() {
             <div className="h-4 w-72 bg-white/5 rounded animate-pulse" />
           </div>
           <div className="w-full h-72 md:h-96 rounded-2xl bg-white/5 animate-pulse" />
-          {/* Made For You skeleton */}
           <ScrollRowSkeleton count={4} />
           <ScrollRowSkeleton count={6} />
           <ScrollRowSkeleton count={6} />
@@ -73,14 +62,14 @@ export default function HomePage() {
           <p className="text-lg font-medium">Could not load content</p>
           <p className="text-sm mt-2 text-red-400/60">{error}</p>
           <button
-            onClick={() => { prevKey.current = ''; fetchData(languages, genre); }}
+            onClick={() => { prevKey.current = ''; fetchData(genre); }}
             className="mt-6 px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-full transition-colors"
           >
             Try Again
           </button>
         </div>
       ) : data ? (
-        <HomeClient data={data} username={username} englishSubFilter={englishSubFilter} />
+        <HomeClient data={data} username={username} />
       ) : null}
     </div>
   );

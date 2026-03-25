@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import LanguageSelector from '@/components/ui/LanguageSelector';
 
 export default function TopBar() {
   const router = useRouter();
@@ -21,10 +20,6 @@ export default function TopBar() {
       >
         <ChevronRight size={18} />
       </button>
-
-      {/* Push language selector to the right */}
-      <div className="flex-1" />
-      <LanguageSelector />
     </div>
   );
 }

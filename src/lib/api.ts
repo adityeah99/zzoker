@@ -196,55 +196,49 @@ async function buildEnglishSection(): Promise<import('./types').LanguageSection>
   };
 }
 
+const FIXED_LANGUAGES = ['hindi', 'punjabi', 'tamil', 'english', 'bhojpuri'];
+const NON_ENGLISH = FIXED_LANGUAGES.filter((l) => l !== 'english');
+
 export async function getHomeData(
-  languages: string[] = ['tamil', 'hindi'],
+  _languages: string[] = FIXED_LANGUAGES,
   genre = 'All',
 ): Promise<HomeData> {
   const suffix = GENRE_QUERY[genre] ?? 'hits 2025';
 
-  const nonEnglish = languages.filter((l) => l !== 'english');
-  const hasEnglish = languages.includes('english');
-
-  // Generic sections for non-English languages
-  const songSearches = nonEnglish.map((lang) =>
+  const songSearches = NON_ENGLISH.map((lang) =>
     searchSongs(`${lang} ${suffix}`, 0, 15).catch(() => null)
   );
-  const albumSearches = nonEnglish.map((lang) =>
+  const albumSearches = NON_ENGLISH.map((lang) =>
     searchAlbums(`${lang} new album 2025`, 0, 10).catch(() => null)
   );
 
-  // Artists + playlists from primary language
-  const primaryLang = languages[0] ?? 'hindi';
-  const artistQuery = LANG_ARTIST[primaryLang] ?? 'arijit singh';
+  const artistQuery = LANG_ARTIST['hindi'] ?? 'arijit singh';
 
-  const [
-    ...songAndAlbumAndMeta
-  ] = await Promise.all([
+  const [...songAndAlbumAndMeta] = await Promise.all([
     ...songSearches,
     ...albumSearches,
     searchArtists(artistQuery, 0, 10).catch(() => null),
-    searchPlaylists(`${primaryLang} top playlist`, 0, 10).catch(() => null),
-    hasEnglish ? buildEnglishSection() : Promise.resolve(null),
+    searchPlaylists('hindi top playlist', 0, 10).catch(() => null),
+    buildEnglishSection(),
   ]);
 
-  const n = nonEnglish.length;
-  const songResults   = songAndAlbumAndMeta.slice(0, n);
-  const albumResults  = songAndAlbumAndMeta.slice(n, 2 * n);
-  const artistResult  = songAndAlbumAndMeta[2 * n] as Awaited<ReturnType<typeof searchArtists>> | null;
+  const n = NON_ENGLISH.length;
+  const songResults    = songAndAlbumAndMeta.slice(0, n);
+  const albumResults   = songAndAlbumAndMeta.slice(n, 2 * n);
+  const artistResult   = songAndAlbumAndMeta[2 * n] as Awaited<ReturnType<typeof searchArtists>> | null;
   const playlistResult = songAndAlbumAndMeta[2 * n + 1] as Awaited<ReturnType<typeof searchPlaylists>> | null;
   const englishSection = songAndAlbumAndMeta[2 * n + 2] as import('./types').LanguageSection | null;
 
-  const sections = nonEnglish.map((lang, i) => ({
+  const nonEnglishSections = NON_ENGLISH.map((lang, i) => ({
     language: lang,
     label: lang.charAt(0).toUpperCase() + lang.slice(1),
     songs:  (songResults[i] as Awaited<ReturnType<typeof searchSongs>> | null)?.results ?? [],
     albums: (albumResults[i] as Awaited<ReturnType<typeof searchAlbums>> | null)?.results ?? [],
   }));
 
-  // Insert English section at its original position in the language order
-  const finalSections = languages.map((lang) => {
+  const finalSections = FIXED_LANGUAGES.map((lang) => {
     if (lang === 'english' && englishSection) return englishSection;
-    return sections.find((s) => s.language === lang)!;
+    return nonEnglishSections.find((s) => s.language === lang)!;
   }).filter(Boolean);
 
   return {

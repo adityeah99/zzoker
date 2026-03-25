@@ -12,7 +12,10 @@
       "Bash(head -5 curl -s --connect-timeout 5 \"https://saavn.sumit.co/api/search/songs?query=hindi&limit=2\")",
       "Bash(npx tsc:*)",
       "Bash(npm install:*)",
-      "Bash(node scripts/generate-icons.mjs)"
+      "Bash(node scripts/generate-icons.mjs)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

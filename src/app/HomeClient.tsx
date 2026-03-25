@@ -6,7 +6,6 @@ import ArtistCard from '@/components/ui/ArtistCard';
 import HeroBanner from '@/components/ui/HeroBanner';
 import MadeForYou from '@/components/ui/MadeForYou';
 import type { HomeData, Song, LanguageSection } from '@/lib/types';
-import type { EnglishSubFilter } from '@/components/ui/GenreFilter';
 import { getImageUrl } from '@/lib/api';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -14,40 +13,27 @@ import Link from 'next/link';
 interface HomeClientProps {
   data: HomeData;
   username: string;
-  englishSubFilter?: EnglishSubFilter;
 }
 
-function renderSection(section: LanguageSection, englishSubFilter: EnglishSubFilter = 'All English') {
+function renderSection(section: LanguageSection) {
   if (section.language === 'english' && section.rapSongs !== undefined) {
-    const showRap = englishSubFilter === 'All English' || englishSubFilter === 'Rap' || englishSubFilter === 'Hip Hop';
-    const showPop = englishSubFilter === 'All English' || englishSubFilter === 'Pop';
-    const showRnb = englishSubFilter === 'R&B';
-
     const rapSongs  = section.rapSongs ?? [];
     const popSongs  = section.popSongs ?? [];
     const rapAlbums = section.rapAlbums ?? [];
     const popAlbums = section.popAlbums ?? [];
 
-    // For Hip Hop sub-filter bias, just use the same rap songs
-    const displayRapSongs  = englishSubFilter === 'Hip Hop'
-      ? rapSongs.filter((_, i) => i % 2 === 0)   // lighter selection
-      : rapSongs;
-
-    // R&B: search in popSongs for closest approximation
-    const rnbSongs = popSongs.slice(0, 12);
-
     return (
       <div key="english" className="space-y-8">
-        {showRap && displayRapSongs.length > 0 && (
+        {rapSongs.length > 0 && (
           <ScrollRow title="🎤 Rap & Hip Hop">
-            {displayRapSongs.map((song) => (
+            {rapSongs.map((song) => (
               <div key={song.id} className="shrink-0 w-40 md:w-44">
-                <SongCard item={song} type="song" queue={displayRapSongs} />
+                <SongCard item={song} type="song" queue={rapSongs} />
               </div>
             ))}
           </ScrollRow>
         )}
-        {showRap && rapAlbums.length > 0 && (
+        {rapAlbums.length > 0 && (
           <ScrollRow title="🔊 Hip Hop Albums">
             {rapAlbums.map((album) => (
               <div key={album.id} className="shrink-0 w-40 md:w-44">
@@ -56,7 +42,7 @@ function renderSection(section: LanguageSection, englishSubFilter: EnglishSubFil
             ))}
           </ScrollRow>
         )}
-        {showPop && popSongs.length > 0 && (
+        {popSongs.length > 0 && (
           <ScrollRow title="🎵 Pop Hits">
             {popSongs.map((song) => (
               <div key={song.id} className="shrink-0 w-40 md:w-44">
@@ -65,20 +51,11 @@ function renderSection(section: LanguageSection, englishSubFilter: EnglishSubFil
             ))}
           </ScrollRow>
         )}
-        {showPop && popAlbums.length > 0 && (
+        {popAlbums.length > 0 && (
           <ScrollRow title="💿 Pop Albums">
             {popAlbums.map((album) => (
               <div key={album.id} className="shrink-0 w-40 md:w-44">
                 <SongCard item={album} type="album" />
-              </div>
-            ))}
-          </ScrollRow>
-        )}
-        {showRnb && rnbSongs.length > 0 && (
-          <ScrollRow title="🎶 R&B">
-            {rnbSongs.map((song) => (
-              <div key={song.id} className="shrink-0 w-40 md:w-44">
-                <SongCard item={song} type="song" queue={rnbSongs} />
               </div>
             ))}
           </ScrollRow>
@@ -112,7 +89,7 @@ function renderSection(section: LanguageSection, englishSubFilter: EnglishSubFil
   );
 }
 
-export default function HomeClient({ data, username, englishSubFilter = 'All English' }: HomeClientProps) {
+export default function HomeClient({ data, username }: HomeClientProps) {
   const { sections, topArtists, featuredPlaylists } = data;
 
   const allSongs = sections.flatMap((s) => s.songs);
@@ -169,7 +146,7 @@ export default function HomeClient({ data, username, englishSubFilter = 'All Eng
       )}
 
       {/* Per-language sections */}
-      {sections.map((section) => renderSection(section, englishSubFilter))}
+      {sections.map((section) => renderSection(section))}
 
       {/* Popular Artists */}
       {topArtists.length > 0 && (
